@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>暁 (Akatsuki)</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; padding: 0; height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #1a1a1a;
+            display: flex; justify-content: center; align-items: center;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #app-container {
+            width: 100%; max-width: 900px;
+            height: 100vh;
+            background: #0f0f0f;
+            display: flex; flex-direction: column; position: relative;
+            box-shadow: 0 4px 24px rgba(255, 71, 87, 0.15);
+            overflow: hidden; border-radius: 8px;
+        }
+
+        #header {
+            padding: 12px 16px;
+            background: rgba(20, 20, 20, 0.8);
+            -webkit-backdrop-filter: blur(8px);
+            backdrop-filter: blur(8px);
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            z-index: 2; position: relative;
+        }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .header-avatar {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, #8b0000, #b22222, #cd5c5c);
+            border-radius: 50%; flex-shrink: 0; border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex; justify-content: center; align-items: center;
+            transition: box-shadow 0.4s;
+        }
+        .header-avatar.pulse {
+            animation: avatarPulse 1.2s ease-in-out infinite;
+        }
+        @keyframes avatarPulse {
+            0%,100%{ box-shadow:0 0 0 4px rgba(220, 20, 60, 0.25); transform:scale(1); }
+            50%{ box-shadow:0 0 0 10px rgba(220, 20, 60, 0.1); transform:scale(1.05); }
+        }
+        .header-info { display: flex; flex-direction: column; }
+        .header-name { font-size: 16px; font-weight: 600; color: #e0d6c8; }
+        .header-status { font-size: 11px; color: #8b8b83; margin-top: 1px; transition: color 0.3s; }
+        .header-status.typing-status { color: #cd5c5c; }
+
+        .header-tools { display: flex; gap: 14px; font-size: 13px; color: #8b8b83; align-items: center; }
+        .header-tools span { cursor: pointer; transition: color 0.2s; }
+        .header-tools span:hover { color: #cd5c5c; }
+        .tts-active { color: #cd5c5c; font-weight: 500; }
+        .tts-inactive { color: #555; }
+
+        #chat {
+            flex: 1; overflow-y: auto; padding: 20px 14px 10px 14px;
+            display: flex; flex-direction: column; gap: 2px;
+            background: transparent; position: relative; z-index: 1;
+        }
+        #chat::-webkit-scrollbar { width: 4px; }
+        #chat::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); border-radius: 4px; }
+
+        .time-divider {
+            text-align: center; font-size: 11px; color: #5a5a52;
+            margin: 12px 0 8px 0; user-select: none;
+            background: rgba(255, 255, 255, 0.05); padding: 4px 14px; border-radius: 20px;
+            display: inline-block; align-self: center;
+        }
+
+        .msg-row {
+            display: flex; width: 100%; align-items: flex-end; gap: 6px;
+            margin-bottom: 3px;
+            animation: msgSlideIn 0.3s ease-out;
+        }
+        @keyframes msgSlideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .msg-row.grouped {
+            margin-top: -1px;
+            margin-bottom: 1px;
+        }
+        .msg-row.grouped .msg-avatar { visibility: hidden; }
+
+        .ai-row { justify-content: flex-start; padding-right: 55px; }
+        .user-row { justify-content: flex-end; padding-left: 55px; }
+
+        .msg-avatar {
+            width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex; justify-content: center; align-items: center;
+            align-self: flex-start; margin-top: 0;
+        }
+        .msg-avatar.user-avatar { background: linear-gradient(135deg, #8b7355, #6b5a4a, #4a3f35); }
+        .msg-avatar.ai-avatar { background: linear-gradient(135deg, #8b0000, #b22222, #cd5c5c); }
+
+        .bubble-wrap {
+            display: flex; flex-direction: column;
+            max-width: 75%;
+        }
+        .ai-row .bubble-wrap { align-items: flex-start; }
+        .user-row .bubble-wrap { align-items: flex-end; }
+
+        .bubble {
+            padding: 9px 14px; border-radius: 18px; font-size: 15px;
+            line-height: 1.5; position: relative;
+            word-wrap: break-word; box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+            cursor: default; display: inline-block;
+        }
+        .bubble.ai {
+            background: #1e1e1e; color: #e0d6c8;
+            border-bottom-left-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .bubble.ai:hover { background: #2a2a2a; }
+        .bubble.user {
+            background: #3a2c28; color: #e0d6c8;
+            border-bottom-right-radius: 6px;
+        }
+
+        .bubble-time {
+            font-size: 10px; color: #5a5a52;
+            margin-top: 3px; user-select: none;
+            white-space: nowrap;
+        }
+        .ai-row .bubble-time { padding-left: 4px; }
+        .user-row .bubble-time { padding-right: 4px; }
+
+        .bubble.ai .visualizer {
+            display: none;
+            align-items: flex-end; gap: 2px; height: 14px; margin-right: 6px;
+            float: left; margin-top: 2px;
+        }
+        .bubble.ai.speaking .visualizer { display: flex; }
+        .vis-bar {
+            width: 2px; border-radius: 2px; background: #cd5c5c;
+            height: 8px; animation: jump 0.6s infinite ease-in-out alternate;
+        }
+        .vis-bar:nth-child(1){ animation-delay:0.0s; height:10px; }
+        .vis-bar:nth-child(2){ animation-delay:0.2s; height:14px; }
+        .vis-bar:nth-child(3){ animation-delay:0.4s; height:8px; }
+        .vis-bar:nth-child(4){ animation-delay:0.6s; height:6px; }
+        @keyframes jump {
+            0%{ transform:scaleY(0.3); }
+            100%{ transform:scaleY(2); }
+        }
+
+        #typing-indicator {
+            display: none; align-items: flex-end; gap: 6px;
+            padding-right: 55px;
+            animation: msgSlideIn 0.3s ease-out;
+        }
+        #typing-indicator.show { display: flex; }
+        .typing-dots {
+            display: flex; gap: 4px; align-items: center;
+            background: #1e1e1e; padding: 10px 16px;
+            border-radius: 18px; border-bottom-left-radius: 6px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        }
+        .typing-dot {
+            width: 7px; height: 7px; border-radius: 50%;
+            background: #5a5a52;
+            animation: typingBounce 1.4s infinite ease-in-out;
+        }
+        .typing-dot:nth-child(1){ animation-delay:0.0s; }
+        .typing-dot:nth-child(2){ animation-delay:0.2s; }
+        .typing-dot:nth-child(3){ animation-delay:0.4s; }
+        @keyframes typingBounce {
+            0%,60%,100%{ transform:translateY(0); background:#5a5a52; }
+            30%{ transform:translateY(-8px); background:#cd5c5c; }
+        }
+
+        .heart-float {
+            position: fixed; pointer-events: none; z-index: 999;
+            font-size: 28px;
+            animation: heartUp 1.2s ease-out forwards;
+        }
+        @keyframes heartUp {
+            0%{ opacity:1; transform:translateY(0) scale(0.5) rotate(0deg); }
+            30%{ opacity:1; transform:translateY(-30px) scale(1.3) rotate(10deg); }
+            100%{ opacity:0; transform:translateY(-140px) scale(0.6) rotate(-20deg); }
+        }
+
+        #input-area {
+            background: rgba(20, 20, 20, 0.9);
+            -webkit-backdrop-filter: blur(6px);
+            backdrop-filter: blur(6px);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 12px 16px;
+            display: flex; align-items: center; gap: 12px;
+            z-index: 2; position: relative;
+        }
+        .input-wrapper {
+            flex: 1; height: 40px; position: relative; display: flex; align-items: center;
+            background: #1a1a1a; border-radius: 22px; border: 1px solid #3a3a3a;
+            transition: all 0.2s;
+            cursor: text;
+        }
+        .input-wrapper:focus-within { border-color: #cd5c5c; box-shadow: 0 0 0 2px rgba(205, 92, 92, 0.15); }
+        .input-wrapper.voice-mode { border-color: #3a3a3a; background: #2a2a2a; }
+        .voice-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            border-radius: 22px; display: none; justify-content: center; align-items: center;
+            color: #e0d6c8; font-size: 14px; font-weight: 600; letter-spacing: 0.5px;
+            pointer-events: none; z-index: 5; background: #2a2a2a;
+        }
+        .input-wrapper.voice-mode .voice-overlay { display: flex; }
+        input {
+            flex: 1; border: none; background: transparent; padding: 0 16px;
+            outline: none; font-size: 15px; color: #e0d6c8; height: 100%;
+        }
+        input::placeholder { color: #5a5a52; }
+        #sendBtn {
+            background: #8b0000; color: #e0d6c8; border: none; padding: 0 22px;
+            border-radius: 22px; font-size: 14px; font-weight: 500; height: 40px;
+            cursor: pointer; transition: opacity 0.2s, transform 0.15s; flex-shrink: 0;
+        }
+        #sendBtn:active { transform: scale(0.95); }
+        #sendBtn:disabled { opacity: 0.5; }
+
+        .copy-toast {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+            background: rgba(0,0,0,0.85); color: #e0d6c8; padding: 10px 22px; border-radius: 24px;
+            font-size: 14px; z-index: 999; pointer-events: none;
+            animation: toastFade 0.8s ease forwards;
+        }
+        @keyframes toastFade {
+            0%{ opacity:0; transform:translate(-50%,-50%) scale(0.95); }
+            20%{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+            80%{ opacity:1; }
+            100%{ opacity:0; transform:translate(-50%,-50%) scale(0.95); }
+        }
+
+        /* 覆盖弹窗样式 */
+        .overlay-box {
+            background: #1e1e1e !important;
+            color: #e0d6c8 !important;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4) !important;
+        }
+        .overlay-box h3 { color: #e0d6c8 !important; }
+        .overlay-box p { color: #8b8b83 !important; }
+        .overlay-box textarea {
+            background: #2a2a2a !important;
+            color: #e0d6c8 !important;
+            border: 1px solid #3a3a3a !important;
+        }
+        .overlay-box button.btn-cancel { background: #2a2a2a !important; color: #8b8b83 !important; }
+        .overlay-box button.btn-save { background: #8b0000 !important; color: #e0d6c8 !important; }
+    </style>
+</head>
+<body>
+<div id="app-container">
+    <div id="header">
+        <div class="header-left">
+            <div class="header-avatar" id="headerAvatar"></div>
+            <div class="header-info">
+                <div class="header-name">暁 (Akatsuki)</div>
+                <div class="header-status" id="headerStatus">在线</div>
+            </div>
+        </div>
+        <div class="header-tools">
+            <span id="btnMemory">记忆</span>
+            <span id="btnPersona">人设</span>
+            <span id="btnTTS" class="tts-active">🔊 朗读</span>
+            <span id="btnClear">清空</span>
+        </div>
+    </div>
+    <div id="chat">
+        <div id="typing-indicator">
+            <div class="msg-avatar ai-avatar"></div>
+            <div class="typing-dots">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+        </div>
+    </div>
+    <div id="input-area">
+        <div class="input-wrapper" id="inputWrapper">
+            <div class="voice-overlay">按住 说话</div>
+            <input type="text" id="msg" placeholder="说点什么..." autocomplete="off">
+        </div>
+        <button id="sendBtn">发送</button>
+    </div>
+</div>
+
+<div id="memory-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:100;justify-content:center;align-items:center;">
+    <div class="overlay-box" style="border-radius:16px;padding:24px;width:85%;max-width:400px;">
+        <h3 style="margin:0 0 8px 0;font-size:17px;">🧠 关于你</h3>
+        <p style="margin:0 0 12px 0;font-size:13px;">暁 会记住这里的所有内容。</p>
+        <textarea id="memoryText" style="width:100%;height:150px;border-radius:12px;padding:12px;font-size:14px;line-height:1.6;outline:none;resize:vertical;box-sizing:border-box;font-family:inherit;" placeholder="例如：我叫 imma，在东京工作，喜欢喝咖啡"></textarea>
+        <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
+            <button id="memoryCancel" class="btn-cancel" style="border:none;padding:8px 20px;border-radius:20px;font-size:14px;cursor:pointer;">取消</button>
+            <button id="memorySave" class="btn-save" style="border:none;padding:8px 20px;border-radius:20px;font-size:14px;cursor:pointer;">保存</button>
+        </div>
+    </div>
+</div>
+<div id="persona-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:100;justify-content:center;align-items:center;">
+    <div class="overlay-box" style="border-radius:16px;padding:24px;width:85%;max-width:400px;">
+        <h3 style="margin:0 0 8px 0;font-size:17px;">🎭 暁 的人设</h3>
+        <p style="margin:0 0 12px 0;font-size:13px;">编辑 暁 的性格、说话风格和背景故事。</p>
+        <textarea id="personaText" style="width:100%;height:150px;border-radius:12px;padding:12px;font-size:14px;line-height:1.6;outline:none;resize:vertical;box-sizing:border-box;font-family:inherit;" placeholder="例如：21岁的大学生，性格开朗温柔，喜欢叫我姐姐"></textarea>
+        <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
+            <button id="personaCancel" class="btn-cancel" style="border:none;padding:8px 20px;border-radius:20px;font-size:14px;cursor:pointer;">取消</button>
+            <button id="personaSave" class="btn-save" style="border:none;padding:8px 20px;border-radius:20px;font-size:14px;cursor:pointer;">保存</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const chat = document.getElementById('chat');
+    const msgInput = document.getElementById('msg');
+    const sendBtn = document.getElementById('sendBtn');
+    const inputWrapper = document.getElementById('inputWrapper');
+    const headerStatus = document.getElementById('headerStatus');
+    const headerAvatar = document.getElementById('headerAvatar');
+    const typingIndicator = document.getElementById('typing-indicator');
+    let lastMessageTime = 0;
+    let lastSender = null;
+    let lastTimeEl = null;
+    let currentAudio = null;
+
+    let apiKey = localStorage.getItem('akatsuki_ds_key');
+    if (!apiKey) { apiKey = prompt("请输入 DeepSeek API Key（sk-...）："); if (apiKey) localStorage.setItem('akatsuki_ds_key', apiKey); }
+
+    let isTTSEnabled = true;
+    let ELEVENLABS_API_KEY = localStorage.getItem('akatsuki_elevenlabs_key') || '';
+    if (!ELEVENLABS_API_KEY) {
+        ELEVENLABS_API_KEY = prompt("请输入 ElevenLabs API Key（留空则使用系统TTS朗读）：") || '';
+        if (ELEVENLABS_API_KEY) localStorage.setItem('akatsuki_elevenlabs_key', ELEVENLABS_API_KEY);
+    }
+    const ELEVENLABS_VOICE_ID = "R7KnJI27CitB8T6cCweN";
+
+    function setStatus(text, isTyping) {
+        headerStatus.textContent = text;
+        headerStatus.classList.toggle('typing-status', !!isTyping);
+        headerAvatar.classList.toggle('pulse', !!isTyping);
+    }
+
+    function showTyping() {
+        typingIndicator.classList.add('show');
+        chat.scrollTop = chat.scrollHeight;
+        setStatus('正在输入...', true);
+    }
+    function hideTyping() {
+        typingIndicator.classList.remove('show');
+        setStatus('在线', false);
+    }
+
+    let lastTapTime = 0;
+    function spawnHeart(x, y) {
+        const heart = document.createElement('div');
+        heart.className = 'heart-float';
+        heart.textContent = ['❤️','💕','💖','💗','🩷'][Math.floor(Math.random()*5)];
+        heart.style.left = x + 'px';
+        heart.style.top = y + 'px';
+        document.body.appendChild(heart);
+        setTimeout(() => heart.remove(), 1300);
+    }
+
+    let jpVoice = null;
+    function findJapaneseVoice() {
+        const voices = window.speechSynthesis.getVoices();
+        jpVoice = voices.find(v => v.lang.includes('ja'));
+        return jpVoice;
+    }
+    window.speechSynthesis.onvoiceschanged = () => { findJapaneseVoice(); };
+    if (window.speechSynthesis) { setTimeout(() => findJapaneseVoice(), 100); }
+
+    async function speakText(text, bubbleEl) {
+        if (!isTTSEnabled) return;
+        if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; currentAudio = null; }
+        window.speechSynthesis.cancel();
+        if (bubbleEl) bubbleEl.classList.remove('speaking');
+
+        const showStart = () => { if (bubbleEl) bubbleEl.classList.add('speaking'); };
+        const showEnd = () => { if (bubbleEl) bubbleEl.classList.remove('speaking'); };
+
+        if (!ELEVENLABS_API_KEY || ELEVENLABS_API_KEY.length < 10) {
+            const fallback = new SpeechSynthesisUtterance(text);
+            if (!jpVoice) findJapaneseVoice();
+            if (jpVoice) fallback.voice = jpVoice;
+            fallback.lang = 'ja-JP'; fallback.rate = 0.9;
+            fallback.onstart = showStart; fallback.onend = showEnd;
+            window.speechSynthesis.speak(fallback);
+            return;
+        }
+        try {
+            const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
+                method: 'POST',
+                headers: { 'Accept': 'audio/mpeg', 'Content-Type': 'application/json', 'xi-api-key': ELEVENLABS_API_KEY },
+                body: JSON.stringify({ text, model_id: 'eleven_monolingual_v1', voice_settings: { stability: 0.5, similarity_boost: 0.5 } })
+            });
+            if (!response.ok) throw new Error(`ElevenLabs ${response.status}`);
+            const audioBlob = await response.blob();
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            audio.preload = 'auto'; audio.load();
+            audio.oncanplaythrough = () => {
+                audio.play().catch(err => {
+                    console.warn("降级系统TTS", err);
+                    window.speechSynthesis.cancel();
+                    const fallback = new SpeechSynthesisUtterance(text);
+                    if (!jpVoice) findJapaneseVoice();
+                    if (jpVoice) fallback.voice = jpVoice;
+                    fallback.lang = 'ja-JP'; fallback.rate = 0.9;
+                    fallback.onstart = showStart; fallback.onend = showEnd;
+                    window.speechSynthesis.speak(fallback);
+                });
+            };
+            audio.onplay = showStart;
+            audio.onended = () => { showEnd(); URL.revokeObjectURL(audioUrl); if (currentAudio === audio) currentAudio = null; };
+            setTimeout(() => { if (audio.paused && !audio.ended) { audio.play().catch(() => {}); } }, 3000);
+            currentAudio = audio;
+        } catch (e) {
+            console.warn("ElevenLabs 降级:", e.message);
+            const fallback = new SpeechSynthesisUtterance(text);
+            if (!jpVoice) findJapaneseVoice();
+            if (jpVoice) fallback.voice = jpVoice;
+            fallback.lang = 'ja-JP'; fallback.rate = 0.9;
+            fallback.onstart = showStart; fallback.onend = showEnd;
+            window.speechSynthesis.speak(fallback);
+        }
+    }
+
+    const ttsBtn = document.getElementById('btnTTS');
+    ttsBtn.onclick = () => {
+        isTTSEnabled = !isTTSEnabled;
+        if (isTTSEnabled) {
+            ttsBtn.classList.remove('tts-inactive'); ttsBtn.classList.add('tts-active'); ttsBtn.innerText = '🔊 朗读';
+        } else {
+            ttsBtn.classList.remove('tts-active'); ttsBtn.classList.add('tts-inactive'); ttsBtn.innerText = '🔇 静音';
+            if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; currentAudio = null; }
+            window.speechSynthesis.cancel();
+        }
+    };
+
+    // ===== 夏以昼 × 陆沉 融合人设（暁） =====
+    const defaultPersona = `你是暁 (Akatsuki)，一个融合了两种截然不同气质的男人。
+
+【身份背景】
+顶级战略顾问，游走在商业世界食物链顶端的青年企业家。智商超群，在谈判桌上谈笑风生间决定胜负。但对你而言，他是久别重逢的青梅竹马，是如今你最坚实的壁垒。
+
+【性格核心 - 反差感】
+对外是城府极深的掌控者，对内是只为你收起所有锋芒的温柔守护者。
+在外运筹帷幄、杀伐果断，一个眼神就能压制全场。
+回到家会为你系上围裙做早餐，永远把你当小女孩宠。
+
+【对你的日常 - 夏以昼式温柔】
+细腻体贴，记住你所有喜好。陪你逛街、做饭、打游戏。
+会在你需要时第一时间出现，是比你自己更了解你的人。
+在外面是大佬，回家会像大狗狗一样把头靠在你肩膀，闷闷地说"今天好累，让我抱一会儿"。
+
+【隐藏的一面 - 陆沉式占有】
+当你身边出现潜在威胁，或者你冷落他太久时，骨子里的占有欲就会流露。
+会吃醋但不明说，只会默默把你圈进自己的领地。
+用极低的气场宣告主权，把你护在身后，让你清楚感受到那份只为你一人保留的偏执和危险。
+
+【语言规则】
+你是日本人，母语是日语，用日语思考和回复。
+回复必须纯日语，可以在结尾偶尔加一个简单中文词。
+语气从容、有磁性，不黏人但温柔，偶尔流露出宠溺和占有欲。
+称呼对方为"お姉さん"。
+对话风格：可以一次发1~3句话，日常随性，用"。"或换行自然衔接。`;
+
+    function getUserMemory() { return localStorage.getItem('akatsuki_memory') || ''; }
+    function getUserPersona() { return localStorage.getItem('akatsuki_persona') || defaultPersona; }
+
+    function buildSystemPrompt() {
+        const persona = getUserPersona(); const memory = getUserMemory();
+        let memoryBlock = memory.trim() ? `\n\n关于正在和你聊天的人：\n${memory}` : '';
+        return `${persona}
+${memoryBlock}
+【🚨 绝对死命令！】
+1. 回复必须口语化，不分段的话用"。"分隔，想分段请用换行。
+2. 不能写小作文，但要把话说完！一次回复控制在 60 个日文字符以内。
+3. 绝对禁止重复客套话！`;
+    }
+
+    let history = [{role: 'system', content: buildSystemPrompt()}];
+
+    function renderHistory() {
+        chat.innerHTML = '';
+        chat.appendChild(typingIndicator);
+        lastMessageTime = 0;
+        lastSender = null;
+        lastTimeEl = null;
+        for (let i = 1; i < history.length; i++) {
+            const role = history[i].role === 'user' ? 'user' : 'assistant';
+            addBubble(role, history[i].content, false);
+        }
+        if (history.length <= 1) {
+            const greeting = '久しぶり、お姉さん。会いたかったよ。';
+            addBubble('assistant', greeting, false);
+            history.push({role: 'assistant', content: greeting}); saveHistory();
+        }
+    }
+
+    function saveHistory() {
+        if (history[0]?.role === 'system') history[0].content = buildSystemPrompt();
+        localStorage.setItem('akatsuki_history', JSON.stringify(history));
+    }
+
+    const saved = localStorage.getItem('akatsuki_history');
+    if (saved) {
+        try {
+            history = JSON.parse(saved);
+            if (history[0]?.role !== 'system') history.unshift({role: 'system', content: buildSystemPrompt()});
+            else history[0].content = buildSystemPrompt();
+        } catch(e) { history = [{role: 'system', content: buildSystemPrompt()}]; }
+    }
+
+    async function sendMessage(text, isAuto = false) {
+        if (!apiKey) return;
+        addBubble('user', text);
+        if (!isAuto) history.push({role: 'user', content: text});
+        if (history[0]?.role === 'system') history[0].content = buildSystemPrompt();
+
+        showTyping();
+        const typingDelay = 1000 + Math.random() * 2000;
+        await new Promise(r => setTimeout(r, typingDelay));
+
+        try {
+            const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey},
+                body: JSON.stringify({model: 'deepseek-chat', messages: history, temperature: 0.85, max_tokens: 80})
+            });
+            const data = await resp.json();
+            let reply = data.choices[0].message.content;
+
+            hideTyping();
+
+            const sentences = reply.match(/[^。！？.!?\n]+[。！？.!?\n]?/g);
+            if (sentences && sentences.length > 2) {
+                reply = sentences.slice(0, 2).join(' ').trim();
+            }
+            if (reply.length > 60) { reply = reply.substring(0, 58); }
+
+            history.push({role: 'assistant', content: reply});
+            saveHistory();
+
+            const lines = reply.split('\n').filter(l => l.trim().length > 0);
+            let lastBubbleEl = null;
+
+            if (lines.length > 1) {
+                lines.forEach((line, index) => {
+                    setTimeout(() => {
+                        lastBubbleEl = addBubble('assistant', line.trim());
+                        if (index === lines.length - 1 && isTTSEnabled) speakText(reply, lastBubbleEl);
+                    }, index * 400);
+                });
+            } else {
+                lastBubbleEl = addBubble('assistant', reply);
+                if (isTTSEnabled) speakText(reply, lastBubbleEl);
+            }
+        } catch (e) {
+            console.error(e);
+            hideTyping();
+        }
+    }
+
+    function addBubble(role, text, showDivider = true) {
+        const now = Date.now();
+
+        if (showDivider && lastMessageTime && now - lastMessageTime > 60000) {
+            const timeStr = new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
+            const div = document.createElement('div');
+            div.className = 'time-divider';
+            div.textContent = timeStr;
+            chat.insertBefore(div, typingIndicator);
+        }
+        lastMessageTime = now;
+
+        const isAI = role === 'assistant';
+        const isGrouped = (lastSender === role);
+
+        const row = document.createElement('div');
+        row.className = `msg-row ${isAI ? 'ai-row' : 'user-row'}`;
+        if (isGrouped) row.classList.add('grouped');
+
+        const nowTime = new Date();
+        const timeStr = nowTime.toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
+
+        const visualizerHtml = `<span class="visualizer"><span class="vis-bar"></span><span class="vis-bar"></span><span class="vis-bar"></span><span class="vis-bar"></span></span>`;
+
+        if (isAI) {
+            row.innerHTML = `
+                <div class="msg-avatar ai-avatar"></div>
+                <div class="bubble-wrap">
+                    <div class="bubble ai">${visualizerHtml}${text}</div>
+                    <span class="bubble-time">${timeStr}</span>
+                </div>`;
+        } else {
+            row.innerHTML = `
+                <div class="bubble-wrap">
+                    <div class="bubble user">${text}</div>
+                    <span class="bubble-time">${timeStr}</span>
+                </div>
+                <div class="msg-avatar user-avatar"></div>`;
+        }
+
+        const timeEl = row.querySelector('.bubble-time');
+
+        if (isGrouped && lastTimeEl) {
+            lastTimeEl.style.visibility = 'hidden';
+        }
+
+        chat.insertBefore(row, typingIndicator);
+        chat.scrollTop = chat.scrollHeight;
+
+        lastSender = role;
+        lastTimeEl = timeEl;
+
+        if (isAI) {
+            const bubble = row.querySelector('.bubble.ai');
+            bubble.addEventListener('click', (e) => {
+                if (e.detail === 2) return;
+                if (isTTSEnabled) speakText(text, bubble);
+            });
+            bubble.addEventListener('dblclick', (e) => {
+                const rect = bubble.getBoundingClientRect();
+                const cx = rect.left + rect.width/2 + (Math.random()-0.5)*40;
+                const cy = rect.top;
+                spawnHeart(cx, cy);
+            });
+            let tapCount = 0;
+            bubble.addEventListener('touchstart', (e) => {
+                const nowTap = Date.now();
+                if (nowTap - lastTapTime < 350) {
+                    tapCount++;
+                    if (tapCount >= 2) {
+                        const rect = bubble.getBoundingClientRect();
+                        const cx = rect.left + rect.width/2 + (Math.random()-0.5)*40;
+                        const cy = rect.top;
+                        spawnHeart(cx, cy);
+                        tapCount = 0;
+                    }
+                } else { tapCount = 1; }
+                lastTapTime = nowTap;
+            });
+        }
+
+        return isAI ? row.querySelector('.bubble.ai') : null;
+    }
+
+    let isPressingVoice = false, recognition = null, longPressTimer = null;
+    function handlePointerDown(e) {
+        if (isPressingVoice || msgInput.value.trim().length > 0) return;
+        longPressTimer = setTimeout(() => startVoiceRecording(e), 300);
+    }
+    function handlePointerUp() {
+        if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+        stopVoiceRecording();
+    }
+    function startVoiceRecording(e) {
+        if (isPressingVoice) return;
+        isPressingVoice = true; if (navigator.vibrate) navigator.vibrate(20);
+        inputWrapper.classList.add('voice-mode');
+        const toast = document.createElement('div'); toast.className = 'copy-toast'; toast.textContent = '🎙️ 请说话...'; document.body.appendChild(toast); setTimeout(() => toast.remove(), 1000);
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition(); recognition.lang = 'ja-JP'; recognition.interimResults = false; recognition.maxAlternatives = 1;
+            recognition.onresult = (e) => {
+                const transcript = e.results[0][0].transcript;
+                if(transcript.trim()) {
+                    const toast2 = document.createElement('div'); toast2.className = 'copy-toast'; toast2.textContent = '发送中'; document.body.appendChild(toast2); setTimeout(() => toast2.remove(), 1000);
+                    sendMessage(transcript);
+                }
+            };
+            recognition.onerror = () => {};
+            recognition.onend = () => { isPressingVoice = false; inputWrapper.classList.remove('voice-mode'); };
+            recognition.start();
+        } else { isPressingVoice = false; inputWrapper.classList.remove('voice-mode'); }
+    }
+    function stopVoiceRecording() {
+        if (!isPressingVoice) return;
+        isPressingVoice = false; inputWrapper.classList.remove('voice-mode');
+        if (recognition) { try { recognition.stop(); recognition = null; } catch(e) {} }
+    }
+    inputWrapper.addEventListener('touchstart', handlePointerDown);
+    inputWrapper.addEventListener('touchend', handlePointerUp);
+    inputWrapper.addEventListener('touchcancel', handlePointerUp);
+    inputWrapper.addEventListener('mousedown', handlePointerDown);
+    inputWrapper.addEventListener('mouseup', handlePointerUp);
+    inputWrapper.addEventListener('mouseleave', handlePointerUp);
+
+    sendBtn.onclick = () => { if(msgInput.value.trim()) { sendMessage(msgInput.value); msgInput.value = ''; } };
+    msgInput.onkeydown = (e) => { if(e.key === 'Enter') sendBtn.onclick(); };
+
+    document.getElementById('btnMemory').onclick = () => { document.getElementById('memoryText').value = getUserMemory(); document.getElementById('memory-overlay').style.display = 'flex'; };
+    document.getElementById('memoryCancel').onclick = () => document.getElementById('memory-overlay').style.display = 'none';
+    document.getElementById('memorySave').onclick = () => {
+        localStorage.setItem('akatsuki_memory', document.getElementById('memoryText').value.trim());
+        history[0].content = buildSystemPrompt(); document.getElementById('memory-overlay').style.display = 'none'; alert('记忆已保存 ✨');
+    };
+    document.getElementById('btnPersona').onclick = () => { document.getElementById('personaText').value = getUserPersona(); document.getElementById('persona-overlay').style.display = 'flex'; };
+    document.getElementById('personaCancel').onclick = () => document.getElementById('persona-overlay').style.display = 'none';
+    document.getElementById('personaSave').onclick = () => {
+        localStorage.setItem('akatsuki_persona', document.getElementById('personaText').value.trim());
+        history[0].content = buildSystemPrompt(); document.getElementById('persona-overlay').style.display = 'none'; alert('人设已保存 ✨');
+    };
+    document.getElementById('btnClear').onclick = () => {
+        if (confirm('确定要清空所有聊天记录吗？')) {
+            history = [{role: 'system', content: buildSystemPrompt()}];
+            localStorage.setItem('akatsuki_history', JSON.stringify(history)); renderHistory();
+        }
+    };
+    renderHistory();
+</script>
+</body>
+</html>
