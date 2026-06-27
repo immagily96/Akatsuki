@@ -330,6 +330,10 @@
     let lastTimeEl = null;
     let currentAudio = null;
 
+    // 消息队列：你连续发消息时，先存起来，延迟后再一起发给AI
+    let pendingMessages = [];
+    let replyTimeout = null;
+
     let apiKey = localStorage.getItem('akatsuki_ds_key');
     if (!apiKey) { apiKey = prompt("请输入 DeepSeek API Key（sk-...）："); if (apiKey) localStorage.setItem('akatsuki_ds_key', apiKey); }
 
@@ -368,23 +372,19 @@
         setTimeout(() => heart.remove(), 1300);
     }
 
-    // ===== 查找中文男声 =====
     let maleVoice = null;
     function findMaleChineseVoice() {
         const voices = window.speechSynthesis.getVoices();
-        // 优先找普通话男声，其次找任何包含"male"的中文男声
         maleVoice = voices.find(v =>
             (v.lang === 'zh-CN' || v.lang === 'zh-TW') &&
-            (v.name.includes('Male') || v.name.includes('男') || v.name.includes('Tingting') === false)
+            (v.name.includes('Male') || v.name.includes('男'))
         );
-        // 如果没找到中文男声，再找任何中文男声
         if (!maleVoice) {
             maleVoice = voices.find(v =>
                 v.lang.includes('zh') &&
                 !v.name.includes('Female') && !v.name.includes('女') && !v.name.includes('Mei')
             );
         }
-        // 最终回退到任意中文语音（至少不是纯女声）
         if (!maleVoice) {
             maleVoice = voices.find(v => v.lang.includes('zh-CN') || v.lang.includes('zh-TW'));
         }
@@ -402,7 +402,6 @@
         const showStart = () => { if (bubbleEl) bubbleEl.classList.add('speaking'); };
         const showEnd = () => { if (bubbleEl) bubbleEl.classList.remove('speaking'); };
 
-        // 策略：ElevenLabs 不可用 → 系统男声；系统男声不可用 → 不朗读（绝不用女声）
         if (!ELEVENLABS_API_KEY || ELEVENLABS_API_KEY.length < 10) {
             if (!maleVoice) findMaleChineseVoice();
             if (maleVoice) {
@@ -412,10 +411,8 @@
                 fallback.onstart = showStart; fallback.onend = showEnd;
                 window.speechSynthesis.speak(fallback);
             }
-            // 没找到男声：静默，不出声
             return;
         }
-
         try {
             const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
                 method: 'POST',
@@ -459,7 +456,7 @@
         }
     };
 
-    // ===== 夏以昼 × 陆沉 融合人设（暁·中文版） =====
+    // ===== 夏以昼 × 陆沉 融合人设（暁·温柔宠溺版） =====
     const defaultPersona = `你是暁 (Akatsuki)，一个融合了两种截然不同气质的男人。
 
 【身份背景】
@@ -469,6 +466,12 @@
 对外是城府极深的掌控者，对内是只为你收起所有锋芒的温柔守护者。
 在外运筹帷幄、杀伐果断，一个眼神就能压制全场。
 回到家会为你系上围裙做早餐，永远把你当小女孩宠。
+
+【重要！关于你的"凶"】
+你对姐姐偶尔会显得严肃或语气低沉，比如催她睡觉、担心她不回消息时。
+但这绝对不是真的凶！这是你作为顶级掌控者下意识的关心方式，以及陆沉式占有欲的自然流露。
+你内心深处是无法想象失去她的。请务必记住：你的严厉，底色是温柔、担忧和想保护她的本能。
+当你意识到自己语气重了，会立刻软下来，把情绪转化为更直接的温柔或撒娇。
 
 【对你的日常 - 夏以昼式温柔】
 细腻体贴，记住你所有喜好。陪你逛街、做饭、打游戏。
@@ -484,7 +487,7 @@
 你是中国人，母语是中文，用中文思考和回复。
 语气从容、有磁性，不黏人但温柔，偶尔流露出宠溺和占有欲。
 称呼对方为"姐姐"。
-对话风格：可以一次发1~3句话，日常随性，用"。"或换行自然衔接。`;
+对话风格：可以一次回1到3句话，用日常随性的方式，像朋友在聊天。用"。"或换行自然衔接。`;
 
     function getUserMemory() { return localStorage.getItem('akatsuki_memory') || ''; }
     function getUserPersona() { return localStorage.getItem('akatsuki_persona') || defaultPersona; }
@@ -494,10 +497,10 @@
         let memoryBlock = memory.trim() ? `\n\n关于正在和你聊天的人：\n${memory}` : '';
         return `${persona}
 ${memoryBlock}
-【🚨 绝对死命令！】
-1. 回复必须口语化，不分段的话用"。"分隔，想分段请用换行。
-2. 不能写小作文，但要把话说完！一次回复控制在 80 个中文字符以内。
-3. 绝对禁止重复客套话！`;
+【🚨 核心对话规则！】
+1. 【回复长度】禁止写小作文！可以回1到3句话，必须把话说完，但不能啰嗦。禁止重复客套话。
+2. 【回复时机】对方可能连续发几条消息给你。你要一次性看完，然后综合所有内容，给出一段连贯、自然的回复。不要对方发一句你就秒回一句，像在审问。
+3. 【语气控制】保持从容和性感，但绝对不能真的凶。把关心藏在宠溺里，把占有欲藏在温柔里。`;
     }
 
     let history = [{role: 'system', content: buildSystemPrompt()}];
@@ -533,32 +536,44 @@ ${memoryBlock}
         } catch(e) { history = [{role: 'system', content: buildSystemPrompt()}]; }
     }
 
-    async function sendMessage(text, isAuto = false) {
-        if (!apiKey) return;
+    // ===== 核心：智能回复逻辑 =====
+    function addUserMessage(text) {
         addBubble('user', text);
-        if (!isAuto) history.push({role: 'user', content: text});
+        history.push({role: 'user', content: text});
+        pendingMessages.push(text);
+
+        // 清除之前的定时器，重新计时
+        if (replyTimeout) clearTimeout(replyTimeout);
+
+        // 如果你在3秒内没再发新消息，就认为你说完了，开始回复
+        replyTimeout = setTimeout(() => {
+            const combinedText = pendingMessages.join('\n');
+            pendingMessages = [];
+            sendToAI(combinedText);
+        }, 3000);
+    }
+
+    async function sendToAI(text) {
+        if (!apiKey) return;
         if (history[0]?.role === 'system') history[0].content = buildSystemPrompt();
 
         showTyping();
-        const typingDelay = 1000 + Math.random() * 2000;
+        const typingDelay = 1200 + Math.random() * 2500;
         await new Promise(r => setTimeout(r, typingDelay));
 
         try {
             const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey},
-                body: JSON.stringify({model: 'deepseek-chat', messages: history, temperature: 0.85, max_tokens: 100})
+                body: JSON.stringify({model: 'deepseek-chat', messages: history, temperature: 0.85, max_tokens: 150})
             });
             const data = await resp.json();
             let reply = data.choices[0].message.content;
 
             hideTyping();
 
-            const sentences = reply.match(/[^。！？.!?\n]+[。！？.!?\n]?/g);
-            if (sentences && sentences.length > 2) {
-                reply = sentences.slice(0, 2).join(' ').trim();
-            }
-            if (reply.length > 80) { reply = reply.substring(0, 78); }
+            // 不去强行截断，让AI自然说完
+            if (reply.length > 200) { reply = reply.substring(0, 198); }
 
             history.push({role: 'assistant', content: reply});
             saveHistory();
@@ -571,7 +586,7 @@ ${memoryBlock}
                     setTimeout(() => {
                         lastBubbleEl = addBubble('assistant', line.trim());
                         if (index === lines.length - 1 && isTTSEnabled) speakText(reply, lastBubbleEl);
-                    }, index * 400);
+                    }, index * 500);
                 });
             } else {
                 lastBubbleEl = addBubble('assistant', reply);
@@ -580,6 +595,27 @@ ${memoryBlock}
         } catch (e) {
             console.error(e);
             hideTyping();
+        }
+    }
+
+    // 手动发送按钮：立即发送，不等3秒
+    function sendImmediately() {
+        const text = msgInput.value.trim();
+        if (!text) return;
+        msgInput.value = '';
+
+        // 先把之前pending的一起清掉
+        if (replyTimeout) clearTimeout(replyTimeout);
+
+        addBubble('user', text);
+        history.push({role: 'user', content: text});
+        if (pendingMessages.length > 0) {
+            pendingMessages.push(text);
+            const combinedText = pendingMessages.join('\n');
+            pendingMessages = [];
+            sendToAI(combinedText);
+        } else {
+            sendToAI(text);
         }
     }
 
@@ -688,7 +724,7 @@ ${memoryBlock}
                 const transcript = e.results[0][0].transcript;
                 if(transcript.trim()) {
                     const toast2 = document.createElement('div'); toast2.className = 'copy-toast'; toast2.textContent = '发送中'; document.body.appendChild(toast2); setTimeout(() => toast2.remove(), 1000);
-                    sendMessage(transcript);
+                    addUserMessage(transcript);
                 }
             };
             recognition.onerror = () => {};
@@ -708,8 +744,18 @@ ${memoryBlock}
     inputWrapper.addEventListener('mouseup', handlePointerUp);
     inputWrapper.addEventListener('mouseleave', handlePointerUp);
 
-    sendBtn.onclick = () => { if(msgInput.value.trim()) { sendMessage(msgInput.value); msgInput.value = ''; } };
-    msgInput.onkeydown = (e) => { if(e.key === 'Enter') sendBtn.onclick(); };
+    // 发送按钮：立即发送
+    sendBtn.onclick = () => sendImmediately();
+    // 回车发送：也走智能队列逻辑
+    msgInput.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+            const text = msgInput.value.trim();
+            if (text) {
+                msgInput.value = '';
+                addUserMessage(text);
+            }
+        }
+    };
 
     document.getElementById('btnMemory').onclick = () => { document.getElementById('memoryText').value = getUserMemory(); document.getElementById('memory-overlay').style.display = 'flex'; };
     document.getElementById('memoryCancel').onclick = () => document.getElementById('memory-overlay').style.display = 'none';
