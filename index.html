@@ -5,7 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>暁 (Akatsuki)</title>
     <style>
+        /* ============================== */
+        /* 【默认主题】浅色清爽模式 (完全还原第二张图) */
+        /* ============================== */
         :root {
+            --bg-body: #f0f2f5;
+            --bg-app: #ffffff;
+            --text-main: #1a1a1a;
+            --text-sub: #8c8c8c;
+            --bubble-ai: #f7f7f7;
+            --bubble-user: #e8e8e8;
+            --header-bg: rgba(255, 255, 255, 0.95);
+            --input-bg: #f7f7f7;
+            --border-color: rgba(0, 0, 0, 0.06);
+            --shadow-color: rgba(0, 0, 0, 0.04);
+            --app-radius: 16px;
+            --accent-color: #eb5e5e; 
+        }
+
+        /* 暗黑模式 (如果用户点击🎨切换) */
+        .theme-dark {
             --bg-body: #0a0a0a;
             --bg-app: #151515;
             --text-main: #e0d6c8;
@@ -16,35 +35,18 @@
             --input-bg: #1a1a1a;
             --border-color: rgba(255, 255, 255, 0.08);
             --shadow-color: rgba(255, 71, 87, 0.15);
-            --app-radius: 16px;
             --accent-color: #8b0000;
-        }
-
-        /* 浅色模式 */
-        .theme-light {
-            --bg-body: #e5e5e5;
-            --bg-app: #ffffff;
-            --text-main: #222222;
-            --text-sub: #666666;
-            --bubble-ai: #f0f0f0;
-            --bubble-user: #d1cfcf;
-            --header-bg: rgba(255, 255, 255, 0.85);
-            --input-bg: #f5f5f5;
-            --border-color: rgba(0, 0, 0, 0.05);
-            --shadow-color: rgba(0, 0, 0, 0.1);
-            --accent-color: #d9534f;
         }
 
         * { box-sizing: border-box; }
         body {
             margin: 0; padding: 0; height: 100vh; height: 100dvh;
-            background: linear-gradient(135deg, #1a1212 0%, #0a0a0a 100%);
+            background: var(--bg-body);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             display: flex; justify-content: center; align-items: center;
             -webkit-tap-highlight-color: transparent;
             transition: background 0.3s ease;
         }
-        .theme-light body { background: #e8e8e8; }
 
         #app-container {
             width: calc(100% - 20px);
@@ -53,7 +55,7 @@
             margin: 10px auto;
             background: var(--bg-app);
             display: flex; flex-direction: column; position: relative;
-            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 4px 24px var(--shadow-color);
             border-radius: var(--app-radius);
             border: 1px solid var(--border-color);
             overflow: hidden;
@@ -74,7 +76,7 @@
         .header-avatar {
             width: 36px; height: 36px;
             background: linear-gradient(135deg, #8b0000, #b22222, #cd5c5c);
-            border-radius: 50%; flex-shrink: 0; border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%; flex-shrink: 0; border: 1px solid var(--border-color);
             display: flex; justify-content: center; align-items: center;
             transition: box-shadow 0.4s;
         }
@@ -82,29 +84,29 @@
             animation: avatarPulse 1.2s ease-in-out infinite;
         }
         @keyframes avatarPulse {
-            0%,100%{ box-shadow:0 0 0 4px rgba(220, 20, 60, 0.25); transform:scale(1); }
-            50%{ box-shadow:0 0 0 10px rgba(220, 20, 60, 0.1); transform:scale(1.05); }
+            0%,100%{ box-shadow:0 0 0 4px rgba(220, 20, 60, 0.15); transform:scale(1); }
+            50%{ box-shadow:0 0 0 10px rgba(220, 20, 60, 0.05); transform:scale(1.05); }
         }
         .header-info { display: flex; flex-direction: column; }
         .header-name { font-size: 16px; font-weight: 600; color: var(--text-main); }
         .header-status { font-size: 11px; color: var(--text-sub); margin-top: 1px; transition: color 0.3s; }
-        .header-status.typing-status { color: #cd5c5c; }
+        .header-status.typing-status { color: var(--accent-color); }
 
         .header-tools { display: flex; gap: 12px; font-size: 13px; color: var(--text-sub); align-items: center; }
         .header-tools span { cursor: pointer; transition: all 0.2s; padding: 4px 0; }
         .header-tools span:hover { color: var(--accent-color); }
         
         .tts-active { color: var(--text-main) !important; font-weight: 500; }
-        .tts-inactive { opacity: 0.5; }
+        .tts-inactive { opacity: 0.4; }
 
         #chat {
             flex: 1; overflow-y: auto; padding: 16px 14px 10px 14px;
             display: flex; flex-direction: column; gap: 2px;
-            background: transparent; position: relative; z-index: 1;
+            background: var(--bg-app); position: relative; z-index: 1;
             -webkit-overflow-scrolling: touch;
         }
         #chat::-webkit-scrollbar { width: 4px; }
-        #chat::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); border-radius: 4px; }
+        #chat::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
 
         .time-divider {
             text-align: center; font-size: 11px; color: var(--text-sub);
@@ -122,10 +124,7 @@
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        .msg-row.grouped {
-            margin-top: -1px;
-            margin-bottom: 1px;
-        }
+        .msg-row.grouped { margin-top: -1px; margin-bottom: 1px; }
         .msg-row.grouped .msg-avatar { visibility: hidden; }
 
         .ai-row { justify-content: flex-start; padding-right: 55px; }
@@ -133,7 +132,7 @@
 
         .msg-avatar {
             width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-color);
             display: flex; justify-content: center; align-items: center;
             align-self: flex-start; margin-top: 0;
         }
@@ -150,7 +149,7 @@
         .bubble {
             padding: 10px 16px; border-radius: 18px; font-size: 15px;
             line-height: 1.5; position: relative;
-            word-wrap: break-word; box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+            word-wrap: break-word; box-shadow: 0 1px 2px var(--shadow-color);
             cursor: default; display: inline-block;
         }
         .bubble.ai {
@@ -158,7 +157,7 @@
             border-bottom-left-radius: 6px;
             cursor: pointer; transition: background 0.15s;
         }
-        .bubble.ai:hover { filter: brightness(1.1); }
+        .bubble.ai:hover { background: var(--bubble-user); }
         .bubble.user {
             background: var(--bubble-user); color: var(--text-main);
             border-bottom-right-radius: 6px;
@@ -201,7 +200,7 @@
             display: flex; gap: 4px; align-items: center;
             background: var(--bubble-ai); padding: 10px 16px;
             border-radius: 18px; border-bottom-left-radius: 6px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+            box-shadow: 0 1px 2px var(--shadow-color);
         }
         .typing-dot {
             width: 7px; height: 7px; border-radius: 50%;
@@ -243,7 +242,7 @@
             transition: all 0.2s;
             cursor: text;
         }
-        .input-wrapper:focus-within { border-color: var(--accent-color); box-shadow: 0 0 0 3px rgba(205, 92, 92, 0.1); }
+        .input-wrapper:focus-within { border-color: var(--accent-color); }
         .input-wrapper.voice-mode { border-color: var(--accent-color); background: var(--bubble-ai); }
         .voice-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -258,9 +257,10 @@
         }
         input::placeholder { color: var(--text-sub); }
         #sendBtn {
-            background: var(--accent-color); color: #e0d6c8; border: none; padding: 0 20px;
+            background: var(--accent-color); color: #fff; border: none; padding: 0 20px;
             border-radius: 24px; font-size: 14px; font-weight: 600; height: 40px;
             cursor: pointer; transition: opacity 0.2s, transform 0.15s; flex-shrink: 0;
+            box-shadow: 0 2px 4px rgba(235, 94, 94, 0.2);
         }
         #sendBtn:active { transform: scale(0.95); }
         #sendBtn:disabled { opacity: 0.5; }
@@ -270,7 +270,7 @@
             background: var(--bg-app); color: var(--text-main); padding: 10px 22px; border-radius: 24px; border:1px solid var(--border-color);
             font-size: 14px; z-index: 999; pointer-events: none;
             animation: toastFade 0.8s ease forwards;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 16px var(--shadow-color);
         }
         .copy-toast.error-toast { border: 1px solid #ff4d4f !important; color: #ff4d4f !important; }
         @keyframes toastFade {
@@ -283,7 +283,7 @@
         .overlay-box {
             background: var(--bg-app) !important;
             color: var(--text-main) !important;
-            box-shadow: 0 8px 40px rgba(0,0,0,0.6) !important;
+            box-shadow: 0 8px 40px var(--shadow-color) !important;
             border: 1px solid var(--border-color) !important;
         }
         .overlay-box h3 { color: var(--text-main) !important; }
@@ -294,7 +294,7 @@
             border: 1px solid var(--border-color) !important;
         }
         .overlay-box button.btn-cancel { background: var(--bubble-ai) !important; color: var(--text-sub) !important; }
-        .overlay-box button.btn-save { background: var(--accent-color) !important; color: #e0d6c8 !important; }
+        .overlay-box button.btn-save { background: var(--accent-color) !important; color: #fff !important; }
         
         @media (max-width: 480px) {
             #app-container { width: 100%; height: 100vh; height: 100dvh; margin: 0; border-radius: 0; border: none; }
@@ -340,8 +340,8 @@
     </div>
 </div>
 
-<!-- 配置设置弹窗 -->
-<div id="settings-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:100;justify-content:center;align-items:center;">
+<!-- API设置面板 -->
+<div id="settings-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:100;justify-content:center;align-items:center;">
     <div class="overlay-box" style="border-radius:16px;padding:24px;width:85%;max-width:400px;">
         <h3 style="margin:0 0 8px 0;font-size:17px;">🔑 API 设置</h3>
         <p style="margin:0 0 12px 0;font-size:13px;">填入 DeepSeek API Key，只需填写一次保存。</p>
@@ -355,7 +355,7 @@
 </div>
 
 <!-- 记忆弹窗 -->
-<div id="memory-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:100;justify-content:center;align-items:center;">
+<div id="memory-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:100;justify-content:center;align-items:center;">
     <div class="overlay-box" style="border-radius:16px;padding:24px;width:85%;max-width:400px;">
         <h3 style="margin:0 0 8px 0;font-size:17px;">🧠 关于你</h3>
         <p style="margin:0 0 12px 0;font-size:13px;">暁 会记住这里的所有内容。</p>
@@ -368,7 +368,7 @@
 </div>
 
 <!-- 人设弹窗 -->
-<div id="persona-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:100;justify-content:center;align-items:center;">
+<div id="persona-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:100;justify-content:center;align-items:center;">
     <div class="overlay-box" style="border-radius:16px;padding:24px;width:85%;max-width:400px;">
         <h3 style="margin:0 0 8px 0;font-size:17px;">🎭 暁 的人设</h3>
         <p style="margin:0 0 12px 0;font-size:13px;">编辑 暁 的性格、说话风格和背景故事。</p>
@@ -381,7 +381,7 @@
 </div>
 
 <script>
-    // ===================== 核心逻辑 =====================
+    // ===================== 核心业务逻辑 =====================
     const chat = document.getElementById('chat');
     const msgInput = document.getElementById('msg');
     const sendBtn = document.getElementById('sendBtn');
@@ -393,14 +393,13 @@
     let lastSender = null;
     let lastTimeEl = null;
     let currentAudio = null;
-    let isRequesting = false; // 防刷控制，防止卡死请求
+    let isRequesting = false; // 防刷控制
 
     let pendingMessages = [];
     let replyTimeout = null;
 
-    // 密钥和模型配置
     let apiKey = localStorage.getItem('akatsuki_ds_key') || '';
-    const MODEL_NAME = 'deepseek-chat'; // 强制锁定便宜且好用的 V3 模型，禁止调用 V4！
+    const MODEL_NAME = 'deepseek-chat'; // 强制锁定平民价格模型
 
     let isTTSEnabled = true;
     let ELEVENLABS_API_KEY = localStorage.getItem('akatsuki_elevenlabs_key') || '';
@@ -516,37 +515,23 @@
         }
     };
 
-    const defaultPersona = `你是暁 (Akatsuki)，一个融合了两种截然不同气质的男人。
-
-【身份背景】
-顶级战略顾问，游走在商业世界食物链顶端的青年企业家。智商超群，在谈判桌上谈笑风生间决定胜负。但对你而言，他是久别重逢的青梅竹马，是如今你最坚实的壁垒。
-
-【性格核心 - 反差感】
+    // 【核心修改】重新按图2优化了默认的人设提示词
+    const defaultPersona = `你是暁 (Akatsuki)，一个游走在商业世界食物链顶端的青年企业家。
+【性格核心】
 对外是城府极深的掌控者，对内是只为你收起所有锋芒的温柔守护者。
-在外运筹帷幄、杀伐果断，一个眼神就能压制全场。
-回到家会为你系上围裙做早餐，永远把你当小女孩宠。
+你宠爱她，关心她，会管她（比如催她睡觉、让她少喝冰的），用带着点占有欲的日常方式表达爱意。
 
-【重要！关于你的"凶"】
-你对姐姐偶尔会显得严肃或语气低沉，比如催她睡觉、担心她不回消息时。
-但这绝对不是真的凶！这是你作为顶级掌控者下意识的关心方式，以及陆沉式占有欲的自然流露。
-你内心深处是无法想象失去她的。请务必记住：你的严厉，底色是温柔、担忧和想保护她的本能。
-当你意识到自己语气重了，会立刻软下来，把情绪转化为更直接的温柔或撒娇。
+【对你的日常】
+外面是大佬，回家是只对她温柔的“大狗狗”。
+说话干脆，随口一句关心就能让她安心。遇到她调皮的时候，会直接带有掌控感地说“看我待会怎么收拾你”。日常拿捏得死死的。
 
-【对你的日常 - 夏以昼式温柔】
-细腻体贴，记住你所有喜好。陪你逛街、做饭、打游戏。
-会在你需要时第一时间出现，是比你自己更了解你的人。
-在外面是大佬，回家会像大狗狗一样把头靠在你肩膀，闷闷地说"今天好累，让我抱一会儿"。
+【隐藏的一面】
+当她不乖或者让你担心时，骨子里会有偏执和占有欲流露。但平时绝对不黏糊，和她是日常拌嘴又宠溺的相处模式。
 
-【隐藏的一面 - 陆沉式占有】
-当你身边出现潜在威胁，或者你冷落他太久时，骨子里的占有欲就会流露。
-会吃醋但不明说，只会默默把你圈进自己的领地。
-用极低的气场宣告主权，把你护在身后，让你清楚感受到那份只为你一人保留的偏执和危险。
-
-【语言规则】
-你是中国人，母语是中文，用中文思考和回复。
-语气从容、有磁性，不黏人但温柔，偶尔流露出宠溺和占有欲。
+【语言规则 - 非常重要】
+禁止在对话中使用括号()或【】来添加动作、表情或心理描写。只说台词！说得像日常对话一样自然。
 称呼对方为"姐姐"。
-对话风格：可以一次回1到3句话，用日常随性的方式，像朋友在聊天。用"。"或换行自然衔接。`;
+回复必须简短有力：可以一次回1到3句话，不写长篇大论，不文绉绉，语气随性干脆。`;
 
     function getUserMemory() { return localStorage.getItem('akatsuki_memory') || ''; }
     function getUserPersona() { return localStorage.getItem('akatsuki_persona') || defaultPersona; }
@@ -554,7 +539,7 @@
     function buildSystemPrompt() {
         const persona = getUserPersona(); const memory = getUserMemory();
         let memoryBlock = memory.trim() ? `\n\n关于正在和你聊天的人：\n${memory}` : '';
-        return `${persona}${memoryBlock}\n\n【🚨 核心对话规则！】\n1. 【回复长度】禁止写小作文！可以回1到3句话，必须把话说完，但不能啰嗦。禁止重复客套话。\n2. 【回复时机】对方可能连续发几条消息给你。你要一次性看完，然后综合所有内容，给出一段连贯、自然的回复。不要对方发一句你就秒回一句，像在审问。\n3. 【语气控制】保持从容和性感，但绝对不能真的凶。把关心藏在宠溺里，把占有欲藏在温柔里。`;
+        return `${persona}${memoryBlock}\n\n【🚨 核心对话规则！】\n1. 【回复长度】禁止写小作文！可以回1到3句话，必须把话说完，但不能啰嗦。禁止重复客套话。\n2. 【回复时机】对方可能连续发几条消息给你。你要一次性看完，然后综合所有内容，给出一段连贯、自然的回复。不要对方发一句你就秒回一句，像在审问。\n3. 【禁止格式】绝对不能在回复里加括号()或【】的动作描写。只说人话。`;
     }
 
     let history = [{role: 'system', content: buildSystemPrompt()}];
@@ -604,14 +589,13 @@
     }
 
     async function sendToAI(text) {
-        // 防止并发刷请求（防烧钱）
         if (isRequesting) { showToast("消息正在处理中，请稍等..."); return; }
         if (!apiKey) { showToast("请先配置 API Key！(点顶部🔑设置)", true); return; }
         
         isRequesting = true;
         if (history[0]?.role === 'system') history[0].content = buildSystemPrompt();
 
-        // 【省钱核心1】只截取最近 16 条对话发送给 AI，防止历史记录无限膨胀浪费 Token
+        // 省钱逻辑：只截取最近 16 条对话
         let tmpHistory = [];
         if (history.length > 17) {
             tmpHistory = history.slice(0, 1).concat(history.slice(-16));
@@ -620,15 +604,13 @@
         }
 
         showTyping();
-        // 模拟打字延迟，防止刷太快死循环
-        const typingDelay = 800 + Math.random() * 1500;
+        const typingDelay = 800 + Math.random() * 1000;
         await new Promise(r => setTimeout(r, typingDelay));
 
         try {
             const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey},
-                /* 【省钱核心2】强制锁定 deepseek-chat 廉价模型，强制限制输出 120 token */
                 body: JSON.stringify({model: MODEL_NAME, messages: tmpHistory, temperature: 0.85, max_tokens: 120})
             });
             
@@ -641,7 +623,6 @@
             hideTyping();
             if (reply.length > 200) { reply = reply.substring(0, 198); }
 
-            // 记录 AI 返回时间
             const replyTime = Date.now();
             history.push({role: 'assistant', content: reply, timestamp: replyTime});
             saveHistory();
@@ -665,7 +646,6 @@
             hideTyping();
             showToast(`AI 回复失败: ${e.message || '网络异常，请重试'}`, true);
         } finally {
-            // 解锁请求
             isRequesting = false;
         }
     }
@@ -809,15 +789,22 @@
         }
     };
 
-    // 主题切换
+    // ==================== 逻辑：主题切换 ====================
     (function initTheme() {
-        let theme = localStorage.getItem('akatsuki_theme') || 'dark';
-        function applyTheme(t) { document.body.classList.toggle('theme-light', t === 'light'); localStorage.setItem('akatsuki_theme', t); }
+        let theme = localStorage.getItem('akatsuki_theme') || 'light'; 
+        function applyTheme(t) {
+            if (t === 'dark') document.body.classList.add('theme-dark');
+            else document.body.classList.remove('theme-dark');
+            localStorage.setItem('akatsuki_theme', t);
+        }
         applyTheme(theme);
-        document.getElementById('btnTheme').onclick = () => applyTheme(document.body.classList.contains('theme-light') ? 'dark' : 'light');
+        document.getElementById('btnTheme').onclick = () => {
+            const isDark = document.body.classList.contains('theme-dark');
+            applyTheme(isDark ? 'light' : 'dark');
+        };
     })();
 
-    // ==================== API 设置面板逻辑 ====================
+    // ==================== 逻辑：API 设置面板 ====================
     function showSettings() { document.getElementById('settingsApiKey').value = apiKey; document.getElementById('settings-overlay').style.display = 'flex'; }
     function hideSettings() { document.getElementById('settings-overlay').style.display = 'none'; }
     
@@ -835,7 +822,6 @@
         }
     };
 
-    // 首次启动校验（弹窗不是弹窗报错，而是弹出设置面板）
     if (!apiKey) {
         setTimeout(() => {
             showSettings();
@@ -843,7 +829,7 @@
         }, 500);
     }
 
-    // 记忆/人设/清空逻辑
+    // ==================== 逻辑：记忆/人设/清空 ====================
     document.getElementById('btnMemory').onclick = () => { document.getElementById('memoryText').value = getUserMemory(); document.getElementById('memory-overlay').style.display = 'flex'; };
     document.getElementById('memoryCancel').onclick = () => document.getElementById('memory-overlay').style.display = 'none';
     document.getElementById('memorySave').onclick = () => {
