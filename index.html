@@ -20,7 +20,7 @@
             --accent-color: #8b0000;
         }
 
-        /* 浅色模式/备用方案 */
+        /* 浅色模式 */
         .theme-light {
             --bg-body: #e5e5e5;
             --bg-app: #ffffff;
@@ -288,7 +288,7 @@
         }
         .overlay-box h3 { color: var(--text-main) !important; }
         .overlay-box p { color: var(--text-sub) !important; }
-        .overlay-box textarea {
+        .overlay-box textarea, .overlay-box input {
             background: var(--input-bg) !important;
             color: var(--text-main) !important;
             border: 1px solid var(--border-color) !important;
@@ -316,6 +316,7 @@
             <span id="btnTheme" title="切换主题">🎨</span>
             <span id="btnMemory">记忆</span>
             <span id="btnPersona">人设</span>
+            <span id="btnSettings">🔑 设置</span>
             <span id="btnTTS" class="tts-active">朗读</span>
             <span id="btnClear">清空</span>
         </div>
@@ -336,6 +337,20 @@
             <input type="text" id="msg" placeholder="说点什么..." autocomplete="off">
         </div>
         <button id="sendBtn">发送</button>
+    </div>
+</div>
+
+<!-- 配置设置弹窗 -->
+<div id="settings-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:100;justify-content:center;align-items:center;">
+    <div class="overlay-box" style="border-radius:16px;padding:24px;width:85%;max-width:400px;">
+        <h3 style="margin:0 0 8px 0;font-size:17px;">🔑 API 设置</h3>
+        <p style="margin:0 0 12px 0;font-size:13px;">填入 DeepSeek API Key，只需填写一次保存。</p>
+        <label style="font-size:13px;color:var(--text-sub);display:block;margin-bottom:4px;">DeepSeek API Key (sk-...)</label>
+        <input id="settingsApiKey" type="text" style="width:100%;padding:12px;border-radius:12px;font-size:14px;outline:none;box-sizing:border-box;font-family:inherit;margin-bottom:16px;" placeholder="输入你的 sk-..." autocomplete="off">
+        <div style="display:flex;gap:10px;margin-top:0;justify-content:flex-end;">
+            <button id="settingsCancel" class="btn-cancel" style="border:none;padding:8px 20px;border-radius:20px;font-size:14px;cursor:pointer;">取消</button>
+            <button id="settingsSave" class="btn-save" style="border:none;padding:8px 20px;border-radius:20px;font-size:14px;cursor:pointer;">保存</button>
+        </div>
     </div>
 </div>
 
@@ -378,12 +393,14 @@
     let lastSender = null;
     let lastTimeEl = null;
     let currentAudio = null;
+    let isRequesting = false; // 防刷控制，防止卡死请求
 
     let pendingMessages = [];
     let replyTimeout = null;
 
-    let apiKey = localStorage.getItem('akatsuki_ds_key');
-    if (!apiKey) { apiKey = prompt("请输入 DeepSeek API Key（sk-...）："); if (apiKey) localStorage.setItem('akatsuki_ds_key', apiKey); }
+    // 密钥和模型配置
+    let apiKey = localStorage.getItem('akatsuki_ds_key') || '';
+    const MODEL_NAME = 'deepseek-chat'; // 强制锁定便宜且好用的 V3 模型，禁止调用 V4！
 
     let isTTSEnabled = true;
     let ELEVENLABS_API_KEY = localStorage.getItem('akatsuki_elevenlabs_key') || '';
@@ -393,7 +410,6 @@
     }
     const ELEVENLABS_VOICE_ID = "R7KnJI27CitB8T6cCweN";
 
-    // 新增：弹窗提示工具
     function showToast(text, isError = false) {
         const toast = document.createElement('div');
         toast.className = 'copy-toast';
@@ -541,7 +557,6 @@
         return `${persona}${memoryBlock}\n\n【🚨 核心对话规则！】\n1. 【回复长度】禁止写小作文！可以回1到3句话，必须把话说完，但不能啰嗦。禁止重复客套话。\n2. 【回复时机】对方可能连续发几条消息给你。你要一次性看完，然后综合所有内容，给出一段连贯、自然的回复。不要对方发一句你就秒回一句，像在审问。\n3. 【语气控制】保持从容和性感，但绝对不能真的凶。把关心藏在宠溺里，把占有欲藏在温柔里。`;
     }
 
-    // 修复 1：历史记录新增 timestamp 字段
     let history = [{role: 'system', content: buildSystemPrompt()}];
 
     function renderHistory() {
@@ -550,7 +565,6 @@
         lastMessageTime = 0; lastSender = null; lastTimeEl = null;
         for (let i = 1; i < history.length; i++) {
             const role = history[i].role === 'user' ? 'user' : 'assistant';
-            // 兼容旧数据，如果没有 timestamp 则默认当前时间
             const timestamp = history[i].timestamp || Date.now();
             addBubble(role, history[i].content, timestamp, false);
         }
@@ -590,18 +604,32 @@
     }
 
     async function sendToAI(text) {
-        if (!apiKey) { showToast("请先配置 API Key！", true); return; }
+        // 防止并发刷请求（防烧钱）
+        if (isRequesting) { showToast("消息正在处理中，请稍等..."); return; }
+        if (!apiKey) { showToast("请先配置 API Key！(点顶部🔑设置)", true); return; }
+        
+        isRequesting = true;
         if (history[0]?.role === 'system') history[0].content = buildSystemPrompt();
 
+        // 【省钱核心1】只截取最近 16 条对话发送给 AI，防止历史记录无限膨胀浪费 Token
+        let tmpHistory = [];
+        if (history.length > 17) {
+            tmpHistory = history.slice(0, 1).concat(history.slice(-16));
+        } else {
+            tmpHistory = history;
+        }
+
         showTyping();
-        const typingDelay = 1200 + Math.random() * 2500;
+        // 模拟打字延迟，防止刷太快死循环
+        const typingDelay = 800 + Math.random() * 1500;
         await new Promise(r => setTimeout(r, typingDelay));
 
         try {
             const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey},
-                body: JSON.stringify({model: 'deepseek-chat', messages: history, temperature: 0.85, max_tokens: 150})
+                /* 【省钱核心2】强制锁定 deepseek-chat 廉价模型，强制限制输出 120 token */
+                body: JSON.stringify({model: MODEL_NAME, messages: tmpHistory, temperature: 0.85, max_tokens: 120})
             });
             
             if (!resp.ok) {
@@ -613,7 +641,7 @@
             hideTyping();
             if (reply.length > 200) { reply = reply.substring(0, 198); }
 
-            // 修复 2：记录 AI 真实返回的时间
+            // 记录 AI 返回时间
             const replyTime = Date.now();
             history.push({role: 'assistant', content: reply, timestamp: replyTime});
             saveHistory();
@@ -635,8 +663,10 @@
         } catch (e) {
             console.error(e);
             hideTyping();
-            // 修复 3：吞消息时立刻弹窗报错
             showToast(`AI 回复失败: ${e.message || '网络异常，请重试'}`, true);
+        } finally {
+            // 解锁请求
+            isRequesting = false;
         }
     }
 
@@ -660,10 +690,8 @@
         }
     }
 
-    // 修复 4：addBubble 支持传入真实的 timestamp 参数
     function addBubble(role, text, timestamp, showDivider = true) {
         const now = timestamp || Date.now();
-
         if (showDivider && lastMessageTime && now - lastMessageTime > 60000) {
             const timeStr = new Date(now).toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
             const div = document.createElement('div');
@@ -672,14 +700,11 @@
             chat.insertBefore(div, typingIndicator);
         }
         lastMessageTime = now;
-
         const isAI = role === 'assistant';
         const isGrouped = (lastSender === role);
-
         const row = document.createElement('div');
         row.className = `msg-row ${isAI ? 'ai-row' : 'user-row'}`;
         if (isGrouped) row.classList.add('grouped');
-
         const timeStr = new Date(now).toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
         const visualizerHtml = `<span class="visualizer"><span class="vis-bar"></span><span class="vis-bar"></span><span class="vis-bar"></span><span class="vis-bar"></span></span>`;
 
@@ -700,12 +725,9 @@
         }
 
         const timeEl = row.querySelector('.bubble-time');
-
         if (isGrouped && lastTimeEl) lastTimeEl.style.visibility = 'hidden';
-
         chat.insertBefore(row, typingIndicator);
         chat.scrollTop = chat.scrollHeight;
-
         lastSender = role;
         lastTimeEl = timeEl;
 
@@ -744,6 +766,8 @@
     }
     function startVoiceRecording(e) {
         if (isPressingVoice) return;
+        if (isRequesting) { showToast("等 AI 说完再发语音吧~"); return; }
+        
         isPressingVoice = true; if (navigator.vibrate) navigator.vibrate(20);
         inputWrapper.classList.add('voice-mode');
         showToast('🎙️ 请说话...');
@@ -785,6 +809,41 @@
         }
     };
 
+    // 主题切换
+    (function initTheme() {
+        let theme = localStorage.getItem('akatsuki_theme') || 'dark';
+        function applyTheme(t) { document.body.classList.toggle('theme-light', t === 'light'); localStorage.setItem('akatsuki_theme', t); }
+        applyTheme(theme);
+        document.getElementById('btnTheme').onclick = () => applyTheme(document.body.classList.contains('theme-light') ? 'dark' : 'light');
+    })();
+
+    // ==================== API 设置面板逻辑 ====================
+    function showSettings() { document.getElementById('settingsApiKey').value = apiKey; document.getElementById('settings-overlay').style.display = 'flex'; }
+    function hideSettings() { document.getElementById('settings-overlay').style.display = 'none'; }
+    
+    document.getElementById('btnSettings').onclick = showSettings;
+    document.getElementById('settingsCancel').onclick = hideSettings;
+    document.getElementById('settingsSave').onclick = () => {
+        const newKey = document.getElementById('settingsApiKey').value.trim();
+        if (newKey) {
+            apiKey = newKey;
+            localStorage.setItem('akatsuki_ds_key', apiKey);
+            hideSettings();
+            showToast("API Key 已保存 ✔️");
+        } else {
+            showToast("请输入正确的 API Key", true);
+        }
+    };
+
+    // 首次启动校验（弹窗不是弹窗报错，而是弹出设置面板）
+    if (!apiKey) {
+        setTimeout(() => {
+            showSettings();
+            showToast("请先配置 DeepSeek API Key", true);
+        }, 500);
+    }
+
+    // 记忆/人设/清空逻辑
     document.getElementById('btnMemory').onclick = () => { document.getElementById('memoryText').value = getUserMemory(); document.getElementById('memory-overlay').style.display = 'flex'; };
     document.getElementById('memoryCancel').onclick = () => document.getElementById('memory-overlay').style.display = 'none';
     document.getElementById('memorySave').onclick = () => {
@@ -803,22 +862,6 @@
             localStorage.setItem('akatsuki_history', JSON.stringify(history)); renderHistory();
         }
     };
-    
-    // 新增：主题切换功能
-    (function initTheme() {
-        let theme = localStorage.getItem('akatsuki_theme') || 'dark';
-        function applyTheme(t) {
-            const body = document.body;
-            if (t === 'light') body.classList.add('theme-light');
-            else body.classList.remove('theme-light');
-            localStorage.setItem('akatsuki_theme', t);
-        }
-        applyTheme(theme);
-        document.getElementById('btnTheme').onclick = () => {
-            const isLight = document.body.classList.contains('theme-light');
-            applyTheme(isLight ? 'dark' : 'light');
-        };
-    })();
 
     renderHistory();
 </script>
