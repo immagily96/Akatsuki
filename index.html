@@ -38,7 +38,6 @@
         * { box-sizing: border-box; }
         body {
             margin: 0; padding: 0; height: 100vh; height: 100dvh;
-            /* 高级背景渐变 */
             background: linear-gradient(135deg, #1a1212 0%, #0a0a0a 100%);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             display: flex; justify-content: center; align-items: center;
@@ -48,14 +47,12 @@
         .theme-light body { background: #e8e8e8; }
 
         #app-container {
-            width: calc(100% - 20px); /* 左右留白 */
+            width: calc(100% - 20px);
             max-width: 860px;
-            /* 上下留白并且适配刘海屏 */
             height: calc(100vh - 20px); height: calc(100dvh - 20px);
             margin: 10px auto;
             background: var(--bg-app);
             display: flex; flex-direction: column; position: relative;
-            /* 增加阴影和圆角 */
             box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
             border-radius: var(--app-radius);
             border: 1px solid var(--border-color);
@@ -268,7 +265,6 @@
         #sendBtn:active { transform: scale(0.95); }
         #sendBtn:disabled { opacity: 0.5; }
 
-        /* Toast 与 覆盖层 颜色适配 */
         .copy-toast {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
             background: var(--bg-app); color: var(--text-main); padding: 10px 22px; border-radius: 24px; border:1px solid var(--border-color);
@@ -276,6 +272,7 @@
             animation: toastFade 0.8s ease forwards;
             box-shadow: 0 4px 16px rgba(0,0,0,0.2);
         }
+        .copy-toast.error-toast { border: 1px solid #ff4d4f !important; color: #ff4d4f !important; }
         @keyframes toastFade {
             0%{ opacity:0; transform:translate(-50%,-50%) scale(0.95); }
             20%{ opacity:1; transform:translate(-50%,-50%) scale(1); }
@@ -369,7 +366,7 @@
 </div>
 
 <script>
-    // ===================== 逻辑保持不变 =====================
+    // ===================== 核心逻辑 =====================
     const chat = document.getElementById('chat');
     const msgInput = document.getElementById('msg');
     const sendBtn = document.getElementById('sendBtn');
@@ -395,6 +392,16 @@
         if (ELEVENLABS_API_KEY) localStorage.setItem('akatsuki_elevenlabs_key', ELEVENLABS_API_KEY);
     }
     const ELEVENLABS_VOICE_ID = "R7KnJI27CitB8T6cCweN";
+
+    // 新增：弹窗提示工具
+    function showToast(text, isError = false) {
+        const toast = document.createElement('div');
+        toast.className = 'copy-toast';
+        toast.textContent = text;
+        if (isError) toast.classList.add('error-toast');
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
 
     function setStatus(text, isTyping) {
         headerStatus.textContent = text;
@@ -426,19 +433,9 @@
     let maleVoice = null;
     function findMaleChineseVoice() {
         const voices = window.speechSynthesis.getVoices();
-        maleVoice = voices.find(v =>
-            (v.lang === 'zh-CN' || v.lang === 'zh-TW') &&
-            (v.name.includes('Male') || v.name.includes('男'))
-        );
-        if (!maleVoice) {
-            maleVoice = voices.find(v =>
-                v.lang.includes('zh') &&
-                !v.name.includes('Female') && !v.name.includes('女') && !v.name.includes('Mei')
-            );
-        }
-        if (!maleVoice) {
-            maleVoice = voices.find(v => v.lang.includes('zh-CN') || v.lang.includes('zh-TW'));
-        }
+        maleVoice = voices.find(v => (v.lang === 'zh-CN' || v.lang === 'zh-TW') && (v.name.includes('Male') || v.name.includes('男')));
+        if (!maleVoice) maleVoice = voices.find(v => v.lang.includes('zh') && !v.name.includes('Female') && !v.name.includes('女') && !v.name.includes('Mei'));
+        if (!maleVoice) maleVoice = voices.find(v => v.lang.includes('zh-CN') || v.lang.includes('zh-TW'));
         return maleVoice;
     }
     window.speechSynthesis.onvoiceschanged = () => { findMaleChineseVoice(); };
@@ -457,8 +454,7 @@
             if (!maleVoice) findMaleChineseVoice();
             if (maleVoice) {
                 const fallback = new SpeechSynthesisUtterance(text);
-                fallback.voice = maleVoice;
-                fallback.lang = 'zh-CN'; fallback.rate = 0.92; fallback.pitch = 0.9;
+                fallback.voice = maleVoice; fallback.lang = 'zh-CN'; fallback.rate = 0.92; fallback.pitch = 0.9;
                 fallback.onstart = showStart; fallback.onend = showEnd;
                 window.speechSynthesis.speak(fallback);
             }
@@ -475,20 +471,17 @@
             const audioUrl = URL.createObjectURL(audioBlob);
             const audio = new Audio(audioUrl);
             audio.preload = 'auto'; audio.load();
-            audio.oncanplaythrough = () => {
-                audio.play().catch(() => {});
-            };
+            audio.oncanplaythrough = () => audio.play().catch(() => {});
             audio.onplay = showStart;
             audio.onended = () => { showEnd(); URL.revokeObjectURL(audioUrl); if (currentAudio === audio) currentAudio = null; };
-            setTimeout(() => { if (audio.paused && !audio.ended) { audio.play().catch(() => {}); } }, 3000);
+            setTimeout(() => { if (audio.paused && !audio.ended) audio.play().catch(() => {}); }, 3000);
             currentAudio = audio;
         } catch (e) {
             console.warn("ElevenLabs 失败，使用系统男声:", e.message);
             if (!maleVoice) findMaleChineseVoice();
             if (maleVoice) {
                 const fallback = new SpeechSynthesisUtterance(text);
-                fallback.voice = maleVoice;
-                fallback.lang = 'zh-CN'; fallback.rate = 0.92; fallback.pitch = 0.9;
+                fallback.voice = maleVoice; fallback.lang = 'zh-CN'; fallback.rate = 0.92; fallback.pitch = 0.9;
                 fallback.onstart = showStart; fallback.onend = showEnd;
                 window.speechSynthesis.speak(fallback);
             }
@@ -545,30 +538,26 @@
     function buildSystemPrompt() {
         const persona = getUserPersona(); const memory = getUserMemory();
         let memoryBlock = memory.trim() ? `\n\n关于正在和你聊天的人：\n${memory}` : '';
-        return `${persona}
-${memoryBlock}
-【🚨 核心对话规则！】
-1. 【回复长度】禁止写小作文！可以回1到3句话，必须把话说完，但不能啰嗦。禁止重复客套话。
-2. 【回复时机】对方可能连续发几条消息给你。你要一次性看完，然后综合所有内容，给出一段连贯、自然的回复。不要对方发一句你就秒回一句，像在审问。
-3. 【语气控制】保持从容和性感，但绝对不能真的凶。把关心藏在宠溺里，把占有欲藏在温柔里。`;
+        return `${persona}${memoryBlock}\n\n【🚨 核心对话规则！】\n1. 【回复长度】禁止写小作文！可以回1到3句话，必须把话说完，但不能啰嗦。禁止重复客套话。\n2. 【回复时机】对方可能连续发几条消息给你。你要一次性看完，然后综合所有内容，给出一段连贯、自然的回复。不要对方发一句你就秒回一句，像在审问。\n3. 【语气控制】保持从容和性感，但绝对不能真的凶。把关心藏在宠溺里，把占有欲藏在温柔里。`;
     }
 
+    // 修复 1：历史记录新增 timestamp 字段
     let history = [{role: 'system', content: buildSystemPrompt()}];
 
     function renderHistory() {
         chat.innerHTML = '';
         chat.appendChild(typingIndicator);
-        lastMessageTime = 0;
-        lastSender = null;
-        lastTimeEl = null;
+        lastMessageTime = 0; lastSender = null; lastTimeEl = null;
         for (let i = 1; i < history.length; i++) {
             const role = history[i].role === 'user' ? 'user' : 'assistant';
-            addBubble(role, history[i].content, false);
+            // 兼容旧数据，如果没有 timestamp 则默认当前时间
+            const timestamp = history[i].timestamp || Date.now();
+            addBubble(role, history[i].content, timestamp, false);
         }
         if (history.length <= 1) {
             const greeting = '好久不见，姐姐。想你了。';
-            addBubble('assistant', greeting, false);
-            history.push({role: 'assistant', content: greeting}); saveHistory();
+            addBubble('assistant', greeting, Date.now(), false);
+            history.push({role: 'assistant', content: greeting, timestamp: Date.now()}); saveHistory();
         }
     }
 
@@ -587,12 +576,12 @@ ${memoryBlock}
     }
 
     function addUserMessage(text) {
-        addBubble('user', text);
-        history.push({role: 'user', content: text});
+        const msgTime = Date.now();
+        addBubble('user', text, msgTime);
+        history.push({role: 'user', content: text, timestamp: msgTime});
         pendingMessages.push(text);
 
         if (replyTimeout) clearTimeout(replyTimeout);
-
         replyTimeout = setTimeout(() => {
             const combinedText = pendingMessages.join('\n');
             pendingMessages = [];
@@ -601,7 +590,7 @@ ${memoryBlock}
     }
 
     async function sendToAI(text) {
-        if (!apiKey) return;
+        if (!apiKey) { showToast("请先配置 API Key！", true); return; }
         if (history[0]?.role === 'system') history[0].content = buildSystemPrompt();
 
         showTyping();
@@ -614,14 +603,19 @@ ${memoryBlock}
                 headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey},
                 body: JSON.stringify({model: 'deepseek-chat', messages: history, temperature: 0.85, max_tokens: 150})
             });
+            
+            if (!resp.ok) {
+                throw new Error(`API 请求失败 (状态码: ${resp.status})`);
+            }
+
             const data = await resp.json();
             let reply = data.choices[0].message.content;
-
             hideTyping();
-
             if (reply.length > 200) { reply = reply.substring(0, 198); }
 
-            history.push({role: 'assistant', content: reply});
+            // 修复 2：记录 AI 真实返回的时间
+            const replyTime = Date.now();
+            history.push({role: 'assistant', content: reply, timestamp: replyTime});
             saveHistory();
 
             const lines = reply.split('\n').filter(l => l.trim().length > 0);
@@ -630,17 +624,19 @@ ${memoryBlock}
             if (lines.length > 1) {
                 lines.forEach((line, index) => {
                     setTimeout(() => {
-                        lastBubbleEl = addBubble('assistant', line.trim());
+                        lastBubbleEl = addBubble('assistant', line.trim(), replyTime);
                         if (index === lines.length - 1 && isTTSEnabled) speakText(reply, lastBubbleEl);
                     }, index * 500);
                 });
             } else {
-                lastBubbleEl = addBubble('assistant', reply);
+                lastBubbleEl = addBubble('assistant', reply, replyTime);
                 if (isTTSEnabled) speakText(reply, lastBubbleEl);
             }
         } catch (e) {
             console.error(e);
             hideTyping();
+            // 修复 3：吞消息时立刻弹窗报错
+            showToast(`AI 回复失败: ${e.message || '网络异常，请重试'}`, true);
         }
     }
 
@@ -648,11 +644,12 @@ ${memoryBlock}
         const text = msgInput.value.trim();
         if (!text) return;
         msgInput.value = '';
-
         if (replyTimeout) clearTimeout(replyTimeout);
 
-        addBubble('user', text);
-        history.push({role: 'user', content: text});
+        const msgTime = Date.now();
+        addBubble('user', text, msgTime);
+        history.push({role: 'user', content: text, timestamp: msgTime});
+        
         if (pendingMessages.length > 0) {
             pendingMessages.push(text);
             const combinedText = pendingMessages.join('\n');
@@ -663,11 +660,12 @@ ${memoryBlock}
         }
     }
 
-    function addBubble(role, text, showDivider = true) {
-        const now = Date.now();
+    // 修复 4：addBubble 支持传入真实的 timestamp 参数
+    function addBubble(role, text, timestamp, showDivider = true) {
+        const now = timestamp || Date.now();
 
         if (showDivider && lastMessageTime && now - lastMessageTime > 60000) {
-            const timeStr = new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
+            const timeStr = new Date(now).toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
             const div = document.createElement('div');
             div.className = 'time-divider';
             div.textContent = timeStr;
@@ -682,9 +680,7 @@ ${memoryBlock}
         row.className = `msg-row ${isAI ? 'ai-row' : 'user-row'}`;
         if (isGrouped) row.classList.add('grouped');
 
-        const nowTime = new Date();
-        const timeStr = nowTime.toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
-
+        const timeStr = new Date(now).toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
         const visualizerHtml = `<span class="visualizer"><span class="vis-bar"></span><span class="vis-bar"></span><span class="vis-bar"></span><span class="vis-bar"></span></span>`;
 
         if (isAI) {
@@ -705,9 +701,7 @@ ${memoryBlock}
 
         const timeEl = row.querySelector('.bubble-time');
 
-        if (isGrouped && lastTimeEl) {
-            lastTimeEl.style.visibility = 'hidden';
-        }
+        if (isGrouped && lastTimeEl) lastTimeEl.style.visibility = 'hidden';
 
         chat.insertBefore(row, typingIndicator);
         chat.scrollTop = chat.scrollHeight;
@@ -717,15 +711,10 @@ ${memoryBlock}
 
         if (isAI) {
             const bubble = row.querySelector('.bubble.ai');
-            bubble.addEventListener('click', (e) => {
-                if (e.detail === 2) return;
-                if (isTTSEnabled) speakText(text, bubble);
-            });
+            bubble.addEventListener('click', (e) => { if (e.detail === 2) return; if (isTTSEnabled) speakText(text, bubble); });
             bubble.addEventListener('dblclick', (e) => {
                 const rect = bubble.getBoundingClientRect();
-                const cx = rect.left + rect.width/2 + (Math.random()-0.5)*40;
-                const cy = rect.top;
-                spawnHeart(cx, cy);
+                spawnHeart(rect.left + rect.width/2 + (Math.random()-0.5)*40, rect.top);
             });
             let tapCount = 0;
             bubble.addEventListener('touchstart', (e) => {
@@ -734,16 +723,13 @@ ${memoryBlock}
                     tapCount++;
                     if (tapCount >= 2) {
                         const rect = bubble.getBoundingClientRect();
-                        const cx = rect.left + rect.width/2 + (Math.random()-0.5)*40;
-                        const cy = rect.top;
-                        spawnHeart(cx, cy);
+                        spawnHeart(rect.left + rect.width/2 + (Math.random()-0.5)*40, rect.top);
                         tapCount = 0;
                     }
                 } else { tapCount = 1; }
                 lastTapTime = nowTap;
             });
         }
-
         return isAI ? row.querySelector('.bubble.ai') : null;
     }
 
@@ -760,21 +746,21 @@ ${memoryBlock}
         if (isPressingVoice) return;
         isPressingVoice = true; if (navigator.vibrate) navigator.vibrate(20);
         inputWrapper.classList.add('voice-mode');
-        const toast = document.createElement('div'); toast.className = 'copy-toast'; toast.textContent = '🎙️ 请说话...'; document.body.appendChild(toast); setTimeout(() => toast.remove(), 1000);
+        showToast('🎙️ 请说话...');
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognition = new SpeechRecognition(); recognition.lang = 'zh-CN'; recognition.interimResults = false; recognition.maxAlternatives = 1;
             recognition.onresult = (e) => {
                 const transcript = e.results[0][0].transcript;
                 if(transcript.trim()) {
-                    const toast2 = document.createElement('div'); toast2.className = 'copy-toast'; toast2.textContent = '发送中'; document.body.appendChild(toast2); setTimeout(() => toast2.remove(), 1000);
+                    showToast('发送中...');
                     addUserMessage(transcript);
                 }
             };
             recognition.onerror = () => {};
             recognition.onend = () => { isPressingVoice = false; inputWrapper.classList.remove('voice-mode'); };
             recognition.start();
-        } else { isPressingVoice = false; inputWrapper.classList.remove('voice-mode'); }
+        } else { isPressingVoice = false; inputWrapper.classList.remove('voice-mode'); showToast('设备不支持语音输入', true); }
     }
     function stopVoiceRecording() {
         if (!isPressingVoice) return;
@@ -803,13 +789,13 @@ ${memoryBlock}
     document.getElementById('memoryCancel').onclick = () => document.getElementById('memory-overlay').style.display = 'none';
     document.getElementById('memorySave').onclick = () => {
         localStorage.setItem('akatsuki_memory', document.getElementById('memoryText').value.trim());
-        history[0].content = buildSystemPrompt(); document.getElementById('memory-overlay').style.display = 'none'; alert('记忆已保存 ✨');
+        history[0].content = buildSystemPrompt(); document.getElementById('memory-overlay').style.display = 'none'; showToast('记忆已保存 ✨');
     };
     document.getElementById('btnPersona').onclick = () => { document.getElementById('personaText').value = getUserPersona(); document.getElementById('persona-overlay').style.display = 'flex'; };
     document.getElementById('personaCancel').onclick = () => document.getElementById('persona-overlay').style.display = 'none';
     document.getElementById('personaSave').onclick = () => {
         localStorage.setItem('akatsuki_persona', document.getElementById('personaText').value.trim());
-        history[0].content = buildSystemPrompt(); document.getElementById('persona-overlay').style.display = 'none'; alert('人设已保存 ✨');
+        history[0].content = buildSystemPrompt(); document.getElementById('persona-overlay').style.display = 'none'; showToast('人设已保存 ✨');
     };
     document.getElementById('btnClear').onclick = () => {
         if (confirm('确定要清空所有聊天记录吗？')) {
@@ -818,16 +804,13 @@ ${memoryBlock}
         }
     };
     
-    // ===================== 新增: 主题切换 =====================
+    // 新增：主题切换功能
     (function initTheme() {
         let theme = localStorage.getItem('akatsuki_theme') || 'dark';
         function applyTheme(t) {
             const body = document.body;
-            if (t === 'light') {
-                body.classList.add('theme-light');
-            } else {
-                body.classList.remove('theme-light');
-            }
+            if (t === 'light') body.classList.add('theme-light');
+            else body.classList.remove('theme-light');
             localStorage.setItem('akatsuki_theme', t);
         }
         applyTheme(theme);
